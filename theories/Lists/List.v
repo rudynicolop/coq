@@ -2323,8 +2323,24 @@ Section Cutting.
      simpl; f_equal. apply IHn. now apply Nat.succ_lt_mono.
      intro H0; rewrite H0 in H; inversion_clear H as [|? H1]; inversion_clear H1.
    Qed.
-
 End Cutting.
+
+Section CuttingMap.
+  Variables A B : Type.
+  Variable f : A -> B.
+
+  Lemma firstn_map_comm : forall n l,
+      firstn n (map f l) = map f (firstn n l).
+  Proof.
+    induction n; intros []; simpl; f_equal; auto 1.
+  Qed.
+
+  Lemma skipn_map_comm : forall n l,
+      skipn n (map f l) = map f (skipn n l).
+  Proof.
+    induction n; intros []; simpl; auto 1.
+  Qed.
+End CuttingMap.
 
 (**************************************************************)
 (** ** Combining pairs of lists of possibly-different lengths *)
