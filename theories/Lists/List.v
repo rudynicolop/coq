@@ -1360,6 +1360,105 @@ Proof.
 Qed.
 
 
+(********************)
+(** Map with index  *)
+(********************)
+
+Section Mapi.
+  Context {A B : Type}.
+  Variable f : nat -> A -> B.
+
+  (** Helper function. *)
+  Fixpoint mapi' (i : nat) (l : list A) : list B :=
+    match l with
+    | [] => []
+    | a :: l => f i a :: mapi' (S i) l
+    end.
+
+  Lemma in_mapi' : forall l i a,
+      In a l ->
+      exists n, In (f (n + i) a) (mapi' i l).
+  Proof.
+    induction l; intros; simpl in *; firstorder subst.
+    - exists 0; auto 2.
+    - apply IHl with (i := S i) in H as [n IH].
+      rewrite Nat.add_succ_r in IH.
+      exists (S n); auto 2.
+  Qed.
+
+  Lemma in_mapi'_exists : forall l i b,
+      In b (mapi' i l) -> exists n a, f (n + i) a = b /\ In a l.
+  Proof.
+    induction l as [| h t IHt];
+      intros i b; simpl in *; firstorder subst.
+    - exists 0; exists h; auto 3.
+    - apply IHt in H as [n [a IH]].
+      rewrite Nat.add_succ_r in IH.
+      exists (S n); exists a; intuition.
+  Qed.
+
+  Lemma mapi'_length : forall l i, length (mapi' i l) = length l.
+  Proof.
+    induction l; simpl; auto 2.
+  Qed.
+
+  Lemma mapi'_app : forall l1 l2 i,
+    mapi' i (l1 ++ l2) = (mapi' i l1) ++ (mapi' (length l1 + i) l2).
+  Proof.
+    induction l1 as [| a1 l1 IHl1];
+      intros; simpl; f_equal; try reflexivity.
+    rewrite IHl1. rewrite Nat.add_succ_r.
+    reflexivity.
+  Qed.
+
+  Lemma mapi'_last : forall l i a,
+    mapi' i (l ++ [a]) = (mapi' i l) ++ [f (length l + i) a].
+  Proof.
+    intros. rewrite mapi'_app. reflexivity.
+  Qed.
+
+  Lemma mapi'_eq_nil : forall l i, mapi' i l = [] -> l = [].
+  Proof.
+    intro l; destruct l; simpl; reflexivity || discriminate.
+  Qed.
+
+  Lemma mapi'_eq_cons : forall l t i b,
+      mapi' i l = b :: t ->
+      exists a tl, l = a :: tl /\ f i a = b /\ mapi' (S i) tl = t.
+  Proof.
+    intros [| a tl] t i b Heq;
+      simpl in *; inversion Heq; subst;
+    exists a, tl; intuition.
+  Qed.
+
+  Lemma mapi'_eq_app  : forall l l1 l2 i,
+      mapi' i l = l1 ++ l2 ->
+      exists l1' l2',
+        l = l1' ++ l2' /\
+        mapi' i l1' = l1 /\
+        mapi' (length l1 + i) l2' = l2.
+  Proof.
+    induction l as [| a l IHl];
+      intros l1 l2 i Heq; simpl in *.
+    - symmetry in Heq;
+        apply app_eq_nil in Heq as [? ?]; subst.
+      exists [], []; auto 3.
+    - destruct l1 as [| b1 l1]; simpl in *.
+      + exists [], (a :: l); auto 3.
+      + injection Heq as ? ?.
+        pose proof IHl _ _ _ H0 as [l1' [l2' [? [? ?]]]]; subst.
+        exists (a :: l1'), l2'; intuition.
+        rewrite Nat.add_succ_r. reflexivity.
+  Qed.
+End Mapi.
+
+Lemma map_mapi' : forall A B (f : A -> B) l i,
+    mapi' (fun _ a => f a) i l = map f l.
+Proof.
+  induction l; intros; simpl;
+    f_equal; auto 1.
+Qed.
+
 (************************************)
 (** Left-to-right iterator on lists *)
 (************************************)
@@ -1395,6 +1494,56 @@ Proof.
   now intros; rewrite IHl, Nat.add_succ_r.
 Qed.
 
+(***********************************************)
+(** Left-to-right iterator with index on lists *)
+(***********************************************)
+
+Section Fold_Left_i.
+  Context {A B : Type}.
+  Variable f : A -> nat -> B -> A.
+
+  Fixpoint fold_left_i' (a : A) (i : nat) (l : list B) : A :=
+    match l with
+    | [] => a
+    | b :: l => fold_left_i' (f a i b) (S i) l
+    end.
+
+  Lemma fold_left_i'_app : forall l1 l2 a i,
+      fold_left_i' a i (l1 ++ l2) =
+      fold_left_i' (fold_left_i' a i l1) (length l1 + i) l2.
+  Proof.
+    induction l1 as [| a1 l1 IHl1];
+      intros; simpl; try reflexivity.
+    rewrite IHl1. rewrite Nat.add_succ_r. reflexivity.
+  Qed.
+End Fold_Left_i.
+
+Lemma fold_left_fold_left_i' : forall A B (f : A -> B -> A) l i a,
+    fold_left_i' (fun a _ b => f a b) a i l=
+    fold_left f l a.
+Proof.
+  induction l as [| a l IHl]; intros; simpl; auto 1.
+Qed.
+
+Lemma fold_left_i'_length : forall A (l : list A) i,
+    fold_left_i' (fun n _ _ => S n) 0 i l = length l.
+Proof.
+  intros. rewrite fold_left_fold_left_i'.
+  apply fold_left_length.
+Qed.
+
+Lemma mapi'_fold_left_i' : forall A B (f : nat -> A -> B) l l' i,
+    l' ++ mapi' f i l =
+    fold_left_i'
+      (fun bs i a => bs ++ [f i a]) l' i l.
+Proof.
+  induction l as [| a l IHl]; intros; simpl.
+  - apply app_nil_r.
+  - rewrite <- IHl; simpl.
+    rewrite <- app_assoc.
+    reflexivity.
+Qed.
+
 (************************************)
 (** Right-to-left iterator on lists *)
 (************************************)
@@ -1412,37 +1561,77 @@ Section Fold_Right_Recursor.
 
 End Fold_Right_Recursor.
 
-  Lemma fold_right_app : forall (A B:Type)(f:A->B->B) l l' i,
+Lemma fold_right_app : forall (A B:Type)(f:A->B->B) l l' i,
     fold_right f i (l++l') = fold_right f (fold_right f i l') l.
-  Proof.
-    intros A B f l; induction l.
-    simpl; auto.
-    simpl; intros.
-    f_equal; auto.
-  Qed.
+Proof.
+  intros A B f l; induction l.
+  simpl; auto.
+  simpl; intros.
+  f_equal; auto.
+Qed.
 
-  Lemma fold_left_rev_right : forall (A B:Type)(f:A->B->B) l i,
+Lemma fold_left_rev_right : forall (A B:Type)(f:A->B->B) l i,
     fold_right f i (rev l) = fold_left (fun x y => f y x) l i.
-  Proof.
-    intros A B f l; induction l.
-    simpl; auto.
-    intros.
-    simpl.
-    rewrite fold_right_app; simpl; auto.
-  Qed.
+Proof.
+  intros A B f l; induction l.
+  simpl; auto.
+  intros.
+  simpl.
+  rewrite fold_right_app; simpl; auto.
+Qed.
 
-  Theorem fold_symmetric :
-    forall (A : Type) (f : A -> A -> A),
+Theorem fold_symmetric :
+  forall (A : Type) (f : A -> A -> A),
     (forall x y z : A, f x (f y z) = f (f x y) z) ->
     forall (a0 : A), (forall y : A, f a0 y = f y a0) ->
     forall (l : list A), fold_left f l a0 = fold_right f a0 l.
+Proof.
+  intros A f assoc a0 comma0 l.
+  induction l as [ | a1 l IHl]; [ simpl; reflexivity | ].
+  simpl. rewrite <- IHl. clear IHl. revert a1.
+  induction l as [|? ? IHl]; [ auto | ].
+  simpl. intro. rewrite <- assoc. rewrite IHl. rewrite IHl. auto.
+Qed.
+
+(***********************************************)
+(** Right-to-left iterator with index on lists *)
+(***********************************************)
+
+Section Fold_Right_i.
+  Context {A B : Type}.
+  Variable f : nat -> A -> B -> B.
+
+  Fixpoint fold_right_i' (i : nat) (l : list A) (init : B) : B :=
+    match l with
+      | [] => init
+      | a :: l => f i a (fold_right_i' (S i) l init)
+    end.
+
+  Lemma fold_right_i'_app : forall l1 l2 i b,
+      fold_right_i' i (l1 ++ l2) b =
+      fold_right_i' i l1 (fold_right_i' (length l1 + i) l2 b).
   Proof.
-    intros A f assoc a0 comma0 l.
-    induction l as [ | a1 l IHl]; [ simpl; reflexivity | ].
-    simpl. rewrite <- IHl. clear IHl. revert a1.
-    induction l as [|? ? IHl]; [ auto | ].
-    simpl. intro. rewrite <- assoc. rewrite IHl. rewrite IHl. auto.
+    induction l1 as [| a1 l1 IHl1];
+      intros; simpl; try reflexivity.
+    rewrite IHl1. rewrite Nat.add_succ_r.
+    reflexivity.
   Qed.
+End Fold_Right_i.
+
+Lemma fold_right_fold_right' : forall A B (f : A -> B -> B) l i b,
+    fold_right_i' (fun _ => f) i l b = fold_right f b l.
+Proof.
+  induction l as [| a l IHl]; intros;
+    simpl; f_equal; auto 1.
+Qed.
+
+Lemma mapi'_fold_right' : forall A B (f : nat -> A -> B) l l' i,
+    mapi' f i l ++ l' =
+    fold_right_i' (fun i a bs => f i a :: bs) i l l'.
+Proof.
+  induction l as [| a l IHl]; intros;
+    simpl; f_equal; auto 1.
+Qed.
 
   (** [(list_power x y)] is [y^x], or the set of sequences of elts of [y]
       indexed by elts of [x], sorted in lexicographic order. *)
@@ -2324,23 +2513,6 @@ Section Cutting.
      intro H0; rewrite H0 in H; inversion_clear H as [|? H1]; inversion_clear H1.
    Qed.
 End Cutting.
-
-Section CuttingMap.
-  Variables A B : Type.
-  Variable f : A -> B.
-
-  Lemma firstn_map_comm : forall n l,
-      firstn n (map f l) = map f (firstn n l).
-  Proof.
-    induction n; intros []; simpl; f_equal; auto 1.
-  Qed.
-
-  Lemma skipn_map_comm : forall n l,
-      skipn n (map f l) = map f (skipn n l).
-  Proof.
-    induction n; intros []; simpl; auto 1.
-  Qed.
-End CuttingMap.
 
 (**************************************************************)
 (** ** Combining pairs of lists of possibly-different lengths *)
