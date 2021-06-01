@@ -1369,15 +1369,15 @@ Section Mapi.
   Variable f : nat -> A -> B.
 
   (** Helper function. *)
-  Fixpoint mapi' (i : nat) (l : list A) : list B :=
+  Fixpoint mapi (i : nat) (l : list A) : list B :=
     match l with
     | [] => []
-    | a :: l => f i a :: mapi' (S i) l
+    | a :: l => f i a :: mapi (S i) l
     end.
 
-  Lemma in_mapi' : forall l i a,
+  Lemma in_mapi : forall l i a,
       In a l ->
-      exists n, In (f (n + i) a) (mapi' i l).
+      exists n, In (f (n + i) a) (mapi i l).
   Proof.
     induction l; intros; simpl in *; firstorder subst.
     - exists 0; auto 2.
@@ -1386,8 +1386,8 @@ Section Mapi.
       exists (S n); auto 2.
   Qed.
 
-  Lemma in_mapi'_exists : forall l i b,
-      In b (mapi' i l) -> exists n a, f (n + i) a = b /\ In a l.
+  Lemma in_mapi_exists : forall l i b,
+      In b (mapi i l) -> exists n a, f (n + i) a = b /\ In a l.
   Proof.
     induction l as [| h t IHt];
       intros i b; simpl in *; firstorder subst.
@@ -1397,13 +1397,13 @@ Section Mapi.
       exists (S n); exists a; intuition.
   Qed.
 
-  Lemma mapi'_length : forall l i, length (mapi' i l) = length l.
+  Lemma mapi_length : forall l i, length (mapi i l) = length l.
   Proof.
     induction l; simpl; auto 2.
   Qed.
 
-  Lemma mapi'_app : forall l1 l2 i,
-    mapi' i (l1 ++ l2) = (mapi' i l1) ++ (mapi' (length l1 + i) l2).
+  Lemma mapi_app : forall l1 l2 i,
+    mapi i (l1 ++ l2) = (mapi i l1) ++ (mapi (length l1 + i) l2).
   Proof.
     induction l1 as [| a1 l1 IHl1];
       intros; simpl; f_equal; try reflexivity.
@@ -1411,32 +1411,32 @@ Section Mapi.
     reflexivity.
   Qed.
 
-  Lemma mapi'_last : forall l i a,
-    mapi' i (l ++ [a]) = (mapi' i l) ++ [f (length l + i) a].
+  Lemma mapi_last : forall l i a,
+    mapi i (l ++ [a]) = (mapi i l) ++ [f (length l + i) a].
   Proof.
-    intros. rewrite mapi'_app. reflexivity.
+    intros. rewrite mapi_app. reflexivity.
   Qed.
 
-  Lemma mapi'_eq_nil : forall l i, mapi' i l = [] -> l = [].
+  Lemma mapi_eq_nil : forall l i, mapi i l = [] -> l = [].
   Proof.
     intro l; destruct l; simpl; reflexivity || discriminate.
   Qed.
 
-  Lemma mapi'_eq_cons : forall l t i b,
-      mapi' i l = b :: t ->
-      exists a tl, l = a :: tl /\ f i a = b /\ mapi' (S i) tl = t.
+  Lemma mapi_eq_cons : forall l t i b,
+      mapi i l = b :: t ->
+      exists a tl, l = a :: tl /\ f i a = b /\ mapi (S i) tl = t.
   Proof.
     intros [| a tl] t i b Heq;
       simpl in *; inversion Heq; subst;
     exists a, tl; intuition.
   Qed.
 
-  Lemma mapi'_eq_app  : forall l l1 l2 i,
-      mapi' i l = l1 ++ l2 ->
+  Lemma mapi_eq_app  : forall l l1 l2 i,
+      mapi i l = l1 ++ l2 ->
       exists l1' l2',
         l = l1' ++ l2' /\
-        mapi' i l1' = l1 /\
-        mapi' (length l1 + i) l2' = l2.
+        mapi i l1' = l1 /\
+        mapi (length l1 + i) l2' = l2.
   Proof.
     induction l as [| a l IHl];
       intros l1 l2 i Heq; simpl in *.
@@ -1452,8 +1452,8 @@ Section Mapi.
   Qed.
 End Mapi.
 
-Lemma map_mapi' : forall A B (f : A -> B) l i,
-    mapi' (fun _ a => f a) i l = map f l.
+Lemma map_mapi : forall A B (f : A -> B) l i,
+    mapi (fun _ a => f a) i l = map f l.
 Proof.
   induction l; intros; simpl;
     f_equal; auto 1.
@@ -1502,15 +1502,15 @@ Section Fold_Left_i.
   Context {A B : Type}.
   Variable f : A -> nat -> B -> A.
 
-  Fixpoint fold_left_i' (a : A) (i : nat) (l : list B) : A :=
+  Fixpoint fold_left_i (a : A) (i : nat) (l : list B) : A :=
     match l with
     | [] => a
-    | b :: l => fold_left_i' (f a i b) (S i) l
+    | b :: l => fold_left_i (f a i b) (S i) l
     end.
 
-  Lemma fold_left_i'_app : forall l1 l2 a i,
-      fold_left_i' a i (l1 ++ l2) =
-      fold_left_i' (fold_left_i' a i l1) (length l1 + i) l2.
+  Lemma fold_left_i_app : forall l1 l2 a i,
+      fold_left_i a i (l1 ++ l2) =
+      fold_left_i (fold_left_i a i l1) (length l1 + i) l2.
   Proof.
     induction l1 as [| a1 l1 IHl1];
       intros; simpl; try reflexivity.
@@ -1518,23 +1518,23 @@ Section Fold_Left_i.
   Qed.
 End Fold_Left_i.
 
-Lemma fold_left_fold_left_i' : forall A B (f : A -> B -> A) l i a,
-    fold_left_i' (fun a _ b => f a b) a i l=
+Lemma fold_left_fold_left_i : forall A B (f : A -> B -> A) l i a,
+    fold_left_i (fun a _ b => f a b) a i l=
     fold_left f l a.
 Proof.
   induction l as [| a l IHl]; intros; simpl; auto 1.
 Qed.
 
-Lemma fold_left_i'_length : forall A (l : list A) i,
-    fold_left_i' (fun n _ _ => S n) 0 i l = length l.
+Lemma fold_left_i_length : forall A (l : list A) i,
+    fold_left_i (fun n _ _ => S n) 0 i l = length l.
 Proof.
-  intros. rewrite fold_left_fold_left_i'.
+  intros. rewrite fold_left_fold_left_i.
   apply fold_left_length.
 Qed.
 
-Lemma mapi'_fold_left_i' : forall A B (f : nat -> A -> B) l l' i,
-    l' ++ mapi' f i l =
-    fold_left_i'
+Lemma mapi_fold_left_i : forall A B (f : nat -> A -> B) l l' i,
+    l' ++ mapi f i l =
+    fold_left_i
       (fun bs i a => bs ++ [f i a]) l' i l.
 Proof.
   induction l as [| a l IHl]; intros; simpl.
@@ -1601,15 +1601,15 @@ Section Fold_Right_i.
   Context {A B : Type}.
   Variable f : nat -> A -> B -> B.
 
-  Fixpoint fold_right_i' (i : nat) (l : list A) (init : B) : B :=
+  Fixpoint fold_right_i (i : nat) (l : list A) (init : B) : B :=
     match l with
       | [] => init
-      | a :: l => f i a (fold_right_i' (S i) l init)
+      | a :: l => f i a (fold_right_i (S i) l init)
     end.
 
-  Lemma fold_right_i'_app : forall l1 l2 i b,
-      fold_right_i' i (l1 ++ l2) b =
-      fold_right_i' i l1 (fold_right_i' (length l1 + i) l2 b).
+  Lemma fold_right_i_app : forall l1 l2 i b,
+      fold_right_i i (l1 ++ l2) b =
+      fold_right_i i l1 (fold_right_i (length l1 + i) l2 b).
   Proof.
     induction l1 as [| a1 l1 IHl1];
       intros; simpl; try reflexivity.
@@ -1619,15 +1619,15 @@ Section Fold_Right_i.
 End Fold_Right_i.
 
 Lemma fold_right_fold_right' : forall A B (f : A -> B -> B) l i b,
-    fold_right_i' (fun _ => f) i l b = fold_right f b l.
+    fold_right_i (fun _ => f) i l b = fold_right f b l.
 Proof.
   induction l as [| a l IHl]; intros;
     simpl; f_equal; auto 1.
 Qed.
 
-Lemma mapi'_fold_right' : forall A B (f : nat -> A -> B) l l' i,
-    mapi' f i l ++ l' =
-    fold_right_i' (fun i a bs => f i a :: bs) i l l'.
+Lemma mapi_fold_right_i : forall A B (f : nat -> A -> B) l l' i,
+    mapi f i l ++ l' =
+    fold_right_i (fun i a bs => f i a :: bs) i l l'.
 Proof.
   induction l as [| a l IHl]; intros;
     simpl; f_equal; auto 1.
@@ -1984,6 +1984,11 @@ Qed.
       | _, _ => nil
       end.
 
+    Lemma combine_nil_r : forall (l : list A), combine l (@nil B) = [].
+    Proof.
+      intros []; reflexivity.
+    Qed.
+
     Lemma split_combine : forall (l: list (A*B)),
       let (l1,l2) := split l in combine l1 l2 = l.
     Proof.
@@ -2100,7 +2105,37 @@ Qed.
   End ListPairs.
 
 
+  Section IteratorCombine.
+    Fixpoint make_indices (n : nat) : list nat :=
+      match n with
+      | O => []
+      | S n => make_indices n ++ [n]
+      end.
 
+    Lemma make_indices_app_end : forall n,
+        make_indices n ++ [n] = 0 :: map S (make_indices n).
+    Proof.
+      induction n as [| n IHn]; simpl in *; try reflexivity.
+      rewrite map_last. rewrite IHn at 1. reflexivity.
+    Qed.
+
+    Let uncurry {A B C : Type} (f : A -> B -> C) '(a,b) := f a b.
+
+    Lemma mapi_combine : forall A B (f : nat -> A -> B) l n,
+        mapi f n l =
+        map
+          (uncurry f)
+          (combine (map (Nat.add n) (make_indices (length l))) l).
+    Proof.
+      induction l as [| h t IHt]; intros n;
+        simpl in *; try reflexivity.
+      rewrite make_indices_app_end; simpl.
+      rewrite Nat.add_0_r; f_equal.
+      rewrite IHt; f_equal.
+      rewrite map_map; repeat f_equal.
+      (** TODO: need functional-extensionality! *)
+    Abort.
+  End IteratorCombine.
 
 (*****************************************)
 (** * Miscellaneous operations on lists  *)
